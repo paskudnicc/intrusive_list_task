@@ -13,11 +13,8 @@ namespace intrusive {
     */
     struct default_tag;
 
-    struct list_element_base {
-    };
-
     template<typename Tag = default_tag>
-    struct list_element : list_element_base {
+    struct list_element {
         list_element *prev;
         list_element *next;
 
@@ -56,7 +53,7 @@ namespace intrusive {
         Иначе нельзя будет создать list_iterator для
         end().
         */
-        list_element_base *current;
+        list_element<Tag> *current;
     public:
         using iterator_category = std::bidirectional_iterator_tag;
         using value_type = std::remove_const_t<T>;
@@ -75,27 +72,23 @@ namespace intrusive {
                 : current(other.current) {}
 
         T &operator*() const noexcept {
-            if (current != nullptr) {
-                return static_cast<T &>(static_cast<list_element<Tag> &>(*current));
-            }
+            return static_cast<T &>(*current);
         }
 
         T *operator->() const noexcept {
-            if (current != nullptr) {
-                return static_cast<T *>(static_cast<list_element<Tag> *>(current));
-            }
+            return static_cast<T *>(current);
         }
 
         list_iterator &operator++() & noexcept {
             if (current != nullptr) {
-                current = static_cast<list_element<Tag> *>(current)->next;
+                current = current->next;
             }
             return *this;
         }
 
         list_iterator &operator--() & noexcept {
             if (current != nullptr) {
-                current = static_cast<list_element<Tag> *>(current)->prev;
+                current = current->prev;
             }
             return *this;
         }
@@ -125,9 +118,9 @@ namespace intrusive {
         Это важно иметь этот конструктор private, чтобы итератор нельзя было создать
         от nullptr.
         */
-        explicit list_iterator(list_element_base *cur) noexcept: current(cur) {}
+        explicit list_iterator(list_element<Tag> *cur) noexcept: current(cur) {}
 
-        explicit list_iterator(const list_element_base *cur) noexcept: current(const_cast<list_element_base *>(cur)) {}
+        explicit list_iterator(const list_element<Tag> *cur) noexcept: current(const_cast<list_element<Tag> *>(cur)) {}
     };
 
     template<typename T, typename Tag>
@@ -157,6 +150,7 @@ namespace intrusive {
                 after_last.prev->next = &after_last;
             }
             other.after_last.prev = other.first = nullptr;
+            return *this;
         }
 
         void clear() noexcept {
