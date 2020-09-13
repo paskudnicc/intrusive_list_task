@@ -25,9 +25,11 @@ namespace intrusive {
         void unlink() {
             if (prev != nullptr) {
                 prev->next = next;
+                next = nullptr;
             }
             if (next != nullptr) {
                 next->prev = prev;
+                prev = nullptr;
             }
         }
     };
@@ -77,16 +79,12 @@ namespace intrusive {
         }
 
         list_iterator &operator++() & noexcept {
-            if (current != nullptr) {
-                current = current->next;
-            }
+            current = current->next;
             return *this;
         }
 
         list_iterator &operator--() & noexcept {
-            if (current != nullptr) {
-                current = current->prev;
-            }
+            current = current->prev;
             return *this;
         }
 
@@ -133,7 +131,7 @@ namespace intrusive {
         list(list const &) = delete;
 
         list(list &&other) noexcept {
-            operator=(std::move(other));
+            splice(begin(), other, other.begin(), other.end());
         }
 
         ~list() {}
@@ -141,21 +139,18 @@ namespace intrusive {
         list &operator=(list const &) = delete;
 
         list &operator=(list &&other) noexcept {
-            first = other.first;
-            after_last.prev = other.after_last.prev;
-            if (after_last.prev != nullptr) {
-                after_last.prev->next = &after_last;
-            }
-            other.after_last.prev = other.first = nullptr;
+            clear();
+            splice(begin(), other, other.begin(), other.end());
             return *this;
         }
 
         void clear() noexcept {
-            first = after_last.prev = nullptr;
+            first = &after_last;
+            after_last.prev = nullptr;
         }
 
-        list_element<Tag> *first = nullptr;
         list_element<Tag> after_last{};
+        list_element<Tag> *first = &after_last;
 
         /*
         Поскольку вставка изменяет данные в list_element
@@ -163,26 +158,11 @@ namespace intrusive {
         */
 
         void push_back(T &elem) noexcept {
-            auto *p = static_cast<list_element<Tag> *>(&elem);
-            if (after_last.prev != nullptr) {
-                after_last.prev->next = p;
-                p->prev = after_last.prev;
-            }
-            after_last.prev = p;
-            p->next = &after_last;
-
-            if (first == nullptr) {
-                first = after_last.prev;
-            }
+            insert(end(), elem);
         }
 
         void pop_back() noexcept {
-            if (after_last.prev != nullptr && after_last.prev->prev != nullptr) {
-                after_last.prev->prev->next = &after_last;
-                after_last.prev = after_last.prev->prev;
-            } else {
-                clear();
-            }
+            erase(const_iterator(after_last.prev));
         }
 
         T &back() noexcept {
@@ -194,25 +174,11 @@ namespace intrusive {
         }
 
         void push_front(T &elem) noexcept {
-            auto *p = static_cast<list_element<Tag> *>(&elem);
-            p->prev = nullptr;
-            if (first != nullptr) {
-                first->prev = p;
-                p->next = first;
-            }
-            first = p;
-            if (after_last.prev == nullptr) {
-                after_last.prev = first;
-            }
+            insert(begin(), elem);
         }
 
         void pop_front() noexcept {
-            if (first != nullptr && first->next != nullptr) {
-                first->next->prev = nullptr;
-                first = first->next;
-            } else {
-                clear();
-            }
+            erase(begin());
         }
 
         T &front() noexcept {
@@ -224,20 +190,14 @@ namespace intrusive {
         }
 
         [[nodiscard]] bool empty() const noexcept {
-            return first == nullptr;
+            return first == &after_last;
         }
 
         iterator begin() noexcept {
-            if (first == nullptr) {
-                return end();
-            }
             return iterator(first);
         }
 
         const_iterator begin() const noexcept {
-            if (first == nullptr) {
-                return end();
-            }
             return const_iterator(first);
         }
 
@@ -291,7 +251,7 @@ namespace intrusive {
                 if (it2 != donor.end()) {
                     donor.first = to;
                 } else {
-                    donor.first = nullptr;
+                    donor.first = &donor.after_last;
                 }
             }
             if (after_incision->prev != nullptr) {
