@@ -1,9 +1,6 @@
 #pragma once
 
-#include <cstdlib>
-#include <type_traits>
-#include <set>
-#include <bits/unique_ptr.h>
+#include <iterator>
 
 namespace intrusive {
     /*
