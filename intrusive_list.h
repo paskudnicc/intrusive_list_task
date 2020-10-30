@@ -15,7 +15,11 @@ namespace intrusive {
         list_element *prev;
         list_element *next;
 
-        explicit list_element(list_element *p = nullptr, list_element *n = nullptr) : prev(p), next(n) {}
+        list_element() {
+            prev = this;
+            next = this;
+        }
+        list_element(list_element *p, list_element *n) : prev(p), next(n) {}
 
         ~list_element() {
             unlink();
@@ -25,12 +29,12 @@ namespace intrusive {
         void unlink() {
             if (prev != nullptr) {
                 prev->next = next;
-                next = nullptr;
             }
             if (next != nullptr) {
                 next->prev = prev;
-                prev = nullptr;
             }
+            prev = nullptr;
+            next = nullptr;
         }
     };
 
@@ -145,12 +149,10 @@ namespace intrusive {
         }
 
         void clear() noexcept {
-            first = &after_last;
-            after_last.prev = nullptr;
+            after_last.prev = after_last.next = &after_last;
         }
 
         list_element<Tag> after_last{};
-        list_element<Tag> *first = &after_last;
 
         /*
         Поскольку вставка изменяет данные в list_element
@@ -182,23 +184,23 @@ namespace intrusive {
         }
 
         T &front() noexcept {
-            return static_cast<T &>(*first);
+            return static_cast<T &>(*after_last.next);
         }
 
         T const &front() const noexcept {
-            return static_cast<const T &>(*first);
+            return static_cast<const T &>(*after_last.next);
         }
 
         [[nodiscard]] bool empty() const noexcept {
-            return first == &after_last;
+            return after_last.next == &after_last;
         }
 
         iterator begin() noexcept {
-            return iterator(first);
+            return iterator(after_last.next);
         }
 
         const_iterator begin() const noexcept {
-            return const_iterator(first);
+            return const_iterator(after_last.next);
         }
 
         iterator end() noexcept {
@@ -212,10 +214,11 @@ namespace intrusive {
         iterator insert(const_iterator pos, T &elem) noexcept {
             auto *new_el = static_cast<list_element<Tag> *>(&elem);
             auto *p = static_cast<list_element<Tag> *>(pos.current);
-            if (p->prev != nullptr) {
+            if (p->prev != p) {
                 p->prev->next = new_el;
             } else {
-                first = new_el;
+                after_last.next = new_el;
+                new_el->prev = &after_last;
             }
             new_el->prev = p->prev;
             p->prev = new_el;
@@ -227,10 +230,11 @@ namespace intrusive {
             if (pos != end()) {
                 auto *p = static_cast<list_element<Tag> *>(pos.current);
                 p->next->prev = p->prev;
-                if (p->prev != nullptr) {
+                if (p->prev != p) {
                     p->prev->next = p->next;
                 } else {
-                    first = p->next;
+                    after_last.next = p->next;
+                    p->next->prev = &after_last;
                 }
                 return iterator(p->next);
             }
@@ -245,26 +249,17 @@ namespace intrusive {
             auto *after_incision = static_cast<list_element<Tag> *>(it0.current);
             auto *from = static_cast<list_element<Tag> *>(it1.current);
             auto *to = static_cast<list_element<Tag> *>(it2.current);
-            if (from->prev != nullptr) {
-                from->prev->next = to;
-            } else {
-                if (it2 != donor.end()) {
-                    donor.first = to;
-                } else {
-                    donor.first = &donor.after_last;
-                }
-            }
-            if (after_incision->prev != nullptr) {
-                after_incision->prev->next = from;
-            } else {
-                first = from;
-            }
+            from->prev->next = to;
             auto *before_incision = after_incision->prev;
+            before_incision->next = from;
             after_incision->prev = to->prev;
-//            to->prev != nullptr because to != donor.first
             to->prev->next = after_incision;
             to->prev = from->prev;
             from->prev = before_incision;
+        }
+
+        [[nodiscard]] static iterator wrap_element(T &el) noexcept {
+            return iterator(static_cast<list_element<Tag> *>(&el));
         }
     };
 }
